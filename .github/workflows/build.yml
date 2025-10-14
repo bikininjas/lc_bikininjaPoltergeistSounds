@@ -19,14 +19,14 @@ jobs:
 
       - name: Create Pull Request
         id: cpr
-        uses: devops-infra/action-pull-request@v0.5.5
+        uses: devops-infra/action-pull-request@v0.6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           source_branch: ${{ github.ref_name }}
           target_branch: master
 
       - name: Label changes
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6.0.1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ steps.cpr.outputs.pr_number }}
@@ -49,7 +49,7 @@ jobs:
       - name: Release Changelog Builder
         if: contains(fromJSON(env.LABELS), 'audio')
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5.0.0
+        uses: mikepenz/release-changelog-builder-action@v6.0.0
         with:
           # fromTag: ${{ steps.tag_version.outputs.new_version }}
           # toTag: ${{ steps.tag_version.outputs.new_version }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Release
         if: contains(fromJSON(env.LABELS), 'audio')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.4.1
         with:
           name: ${{ steps.tag_version.outputs.new_version }}
           tag_name: ${{ steps.tag_version.outputs.new_version }}
