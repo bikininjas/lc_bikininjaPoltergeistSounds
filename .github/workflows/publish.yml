@@ -1,0 +1,40 @@
+name: Publish Package on Thunderstore
+
+on:
+  workflow_dispatch:
+  release:
+    types: released
+
+env:
+  description: "Bikininjas custom Sounds for mod Poltergeist with french people voices and memes for Lethal Company"
+  mod_name: "BikininjasSounds"
+  website_url: "https://github.com/${{ github.repository }}"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+      - name: Get latest release number
+        id: latest_release # used to read version in other steps.
+        run: |
+          echo "release_number=$(curl https://api.github.com/repos/${{ github.repository }}/releases/latest -s | jq -r '.tag_name // empty')" >> $GITHUB_ENV
+
+      - uses: GreenTF/upload-thunderstore-package@v4.3
+        with:
+          namespace: Bikininjas # the thunderstore 'team' to publish under
+          description: ${{ env.description }}
+          token: ${{ secrets.THUNDERSTORE_SVC_API_KEY }}
+          name: ${{ env.mod_name }}
+          version: ${{ env.release_number }} # Use the tag as the package version
+          community: lethal-company
+          deps: |
+            coderCleric-Poltergeist-1.2.8
+          website: "${{ env.website_url }}"
+          repo: thunderstore.io
+          categories: | # <-- notice this pipe character
+              audio
