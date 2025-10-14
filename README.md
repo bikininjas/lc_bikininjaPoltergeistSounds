@@ -40,7 +40,7 @@ This sound pack includes a diverse range of sounds:
    ├── BepInEx/
    │   ├── plugins/
    │   │   ├── PoltergeistSounds/
-   │   │   │       └── (more sound files)
+   │   │   │       └── (sound files)
    ```
 5. Launch the game and enjoy haunting your friends!
 
