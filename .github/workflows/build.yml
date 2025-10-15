@@ -19,11 +19,11 @@ jobs:
 
       - name: Create Pull Request
         id: cpr
-        uses: devops-infra/action-pull-request@v0.6.1
+        uses: peter-evans/create-pull-request@v7.0.8
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          source_branch: ${{ github.ref_name }}
-          target_branch: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref_name }}
+          base: master
 
       - name: Label changes
         uses: actions/labeler@v6.0.1
