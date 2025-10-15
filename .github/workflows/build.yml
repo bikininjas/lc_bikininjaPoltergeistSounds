@@ -17,33 +17,67 @@ jobs:
           fetch-depth: 0
           filter: tree:0
 
-      - name: Create Pull Request
-        id: cpr
-        uses: peter-evans/create-pull-request@v7
+      - name: Check if PR exists
+        id: check-pr
+        uses: actions/github-script@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref_name }}
-          base: master
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            
+            if (prs.length > 0) {
+              core.setOutput('pr-number', prs[0].number);
+              core.setOutput('pr-exists', 'true');
+              console.log(`Found existing PR #${prs[0].number}`);
+            } else {
+              core.setOutput('pr-exists', 'false');
+              console.log('No existing PR found');
+            }
+
+      - name: Create Pull Request
+        if: steps.check-pr.outputs.pr-exists == 'false'
+        id: cpr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Changes from ${branch}`,
+              head: branch,
+              base: 'master',
+              body: `Automated PR from branch ${branch}`
+            });
+            core.setOutput('pr-number', pr.number);
+            console.log(`Created PR #${pr.number}`);
 
       - name: Label changes
-        if: steps.cpr.outputs.pull-request-number
+        if: steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number
         uses: actions/labeler@v6
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.cpr.outputs.pull-request-number }}
+          pr-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
           sync-labels: true
 
       - name: Get PR labels
-        if: steps.cpr.outputs.pull-request-number
+        if: steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number
         id: pr-labels
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const prNumber = ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }};
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: ${{ steps.cpr.outputs.pull-request-number }}
+              pull_number: prNumber
             });
             const labels = pr.data.labels.map(label => label.name);
             core.setOutput('labels', JSON.stringify(labels));
@@ -121,6 +155,6 @@ jobs:
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+          pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
           merge-method: squash
           # This will only merge after all required status checks pass
