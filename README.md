@@ -1,4 +1,4 @@
-# Poltergeist Custom Sounds Pack
+# Poltergeist Custom Sounds Pack !
 
 A custom sound pack for Lethal Company that adds unique audio files to the Poltergeist mod, allowing dead players to haunt their living teammates with a variety of spooky and entertaining sounds.
 
