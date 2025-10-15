@@ -7,7 +7,7 @@ on:
 
 env:
   description: "Bikininjas custom Sounds for mod Poltergeist with french people voices and memes for Lethal Company"
-  mod_name: "BikininjasSounds"
+  mod_name: "BikininjasPoltergeistSounds"
   website_url: "https://github.com/${{ github.repository }}"
 
 jobs:
