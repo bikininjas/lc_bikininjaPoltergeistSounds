@@ -29,12 +29,12 @@ jobs:
         uses: actions/labeler@v6.0.1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.cpr.outputs.pr_number }}
+          pr-number: ${{ steps.cpr.outputs.pull-request-number }}
           sync-labels: true
       - name: Get Labels Action
         uses: snnaplab/get-labels-action@v1.0.1
         with:
-          number: ${{ steps.cpr.outputs.pr_number }}
+          number: ${{ steps.cpr.outputs.pull-request-number }}
             
       - name: Bump version and push tag
         if: contains(fromJSON(env.LABELS), 'audio')
