@@ -83,9 +83,10 @@ jobs:
             core.setOutput('labels', JSON.stringify(labels));
             core.setOutput('has-audio', labels.includes('audio'));
             core.setOutput('has-cicd', labels.includes('cicd'));
+            core.setOutput('should-release', labels.includes('audio') || labels.includes('cicd'));
             
       - name: Bump version and push tag
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
@@ -96,7 +97,7 @@ jobs:
           tag_prefix: ''
           
       - name: Release Changelog Builder
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v5
         with:
@@ -134,12 +135,12 @@ jobs:
             }
             
       - name: See CHANGELOG
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         run: |
           echo "${{ steps.changelog.outputs.changelog }}"
 
       - name: Release
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.tag_version.outputs.new_version }}
