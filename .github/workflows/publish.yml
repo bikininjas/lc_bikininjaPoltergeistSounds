@@ -3,7 +3,7 @@ name: Publish Package on Thunderstore
 on:
   workflow_dispatch:
   release:
-    types: released
+    types: [released]
 
 env:
   description: "Bikininjas custom Sounds for mod Poltergeist with french people voices and memes for Lethal Company"
@@ -13,28 +13,38 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          filter: tree:0
-      - name: Get latest release number
-        id: latest_release # used to read version in other steps.
-        run: |
-          echo "release_number=$(curl https://api.github.com/repos/${{ github.repository }}/releases/latest -s | jq -r '.tag_name // empty')" >> $GITHUB_ENV
-
-      - uses: GreenTF/upload-thunderstore-package@v4.3
+          
+      - name: Get latest release version
+        id: get_version
+        uses: actions/github-script@v7
         with:
-          namespace: Bikininjas # the thunderstore 'team' to publish under
+          script: |
+            const { data: release } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            core.setOutput('version', release.tag_name);
+            console.log(`Latest release version: ${release.tag_name}`);
+
+      - name: Upload to Thunderstore
+        uses: GreenTF/upload-thunderstore-package@v4.3
+        with:
+          namespace: Bikininjas
           description: ${{ env.description }}
           token: ${{ secrets.THUNDERSTORE_SVC_API_KEY }}
           name: ${{ env.mod_name }}
-          version: ${{ env.release_number }} # Use the tag as the package version
+          version: ${{ steps.get_version.outputs.version }}
           community: lethal-company
           deps: |
             coderCleric-Poltergeist-1.2.8
-          website: "${{ env.website_url }}"
+          website: ${{ env.website_url }}
           repo: thunderstore.io
-          categories: | # <-- notice this pipe character
-              audio
+          categories: |
+            audio
