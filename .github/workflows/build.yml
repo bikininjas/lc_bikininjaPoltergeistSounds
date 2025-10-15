@@ -12,32 +12,80 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           filter: tree:0
 
-      - name: Create Pull Request
-        id: cpr
-        uses: devops-infra/action-pull-request@v0.5.5
+      - name: Check if PR exists
+        id: check-pr
+        uses: actions/github-script@v7
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          source_branch: ${{ github.ref_name }}
-          target_branch: master
+          github-token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            
+            if (prs.length > 0) {
+              core.setOutput('pr-number', prs[0].number);
+              core.setOutput('pr-exists', 'true');
+              console.log(`Found existing PR #${prs[0].number}`);
+            } else {
+              core.setOutput('pr-exists', 'false');
+              console.log('No existing PR found');
+            }
+
+      - name: Create Pull Request
+        if: steps.check-pr.outputs.pr-exists == 'false'
+        id: cpr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Changes from ${branch}`,
+              head: branch,
+              base: 'master',
+              body: `Automated PR from branch ${branch}`
+            });
+            core.setOutput('pr-number', pr.number);
+            console.log(`Created PR #${pr.number}`);
 
       - name: Label changes
-        uses: actions/labeler@v5
+        if: steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number
+        uses: actions/labeler@v6
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.cpr.outputs.pr_number }}
+          pr-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
           sync-labels: true
-      - name: Get Labels Action
-        uses: snnaplab/get-labels-action@v1.0.1
+
+      - name: Get PR labels
+        if: steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number
+        id: pr-labels
+        uses: actions/github-script@v7
         with:
-          number: ${{ steps.cpr.outputs.pr_number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }};
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            const labels = pr.data.labels.map(label => label.name);
+            core.setOutput('labels', JSON.stringify(labels));
+            core.setOutput('has-audio', labels.includes('audio'));
+            core.setOutput('has-cicd', labels.includes('cicd'));
             
       - name: Bump version and push tag
-        if: contains(fromJSON(env.LABELS), 'audio')
+        if: steps.pr-labels.outputs.has-audio == 'true'
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
@@ -46,13 +94,12 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_prerelease_bump: patch
           tag_prefix: ''
+          
       - name: Release Changelog Builder
-        if: contains(fromJSON(env.LABELS), 'audio')
+        if: steps.pr-labels.outputs.has-audio == 'true'
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5.0.0
+        uses: mikepenz/release-changelog-builder-action@v5
         with:
-          # fromTag: ${{ steps.tag_version.outputs.new_version }}
-          # toTag: ${{ steps.tag_version.outputs.new_version }}
           outputFile: "CHANGELOG.MD"
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: "COMMIT"
@@ -60,24 +107,23 @@ jobs:
             {
               "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Uncategorized</summary>\n\n#{{UNCATEGORIZED}}\n</details>",
               "categories": [
-                "categories": [
-                  {
-                    "title": "## 🎹 Audio",
-                    "labels": ["audio", "sound", "sounds"]
-                  },
-                  {
-                    "title": "## 🐛 Fixes",
-                    "labels": ["fix", "fixes"]
-                  },
-                  {
-                    "title": "## 🔩 CI/CD (you don't care)",
-                    "labels": ["ci", "cicd", "cd"]
-                  },
-                  {
-                    "key": "tests",
-                    "title": "## 🧪 Tests",
-                    "labels": ["test", "tests"]
-                  }
+                {
+                  "title": "## 🎹 Audio",
+                  "labels": ["audio", "sound", "sounds"]
+                },
+                {
+                  "title": "## 🐛 Fixes",
+                  "labels": ["fix", "fixes"]
+                },
+                {
+                  "title": "## 🔩 CI/CD (you don't care)",
+                  "labels": ["ci", "cicd", "cd"]
+                },
+                {
+                  "key": "tests",
+                  "title": "## 🧪 Tests",
+                  "labels": ["test", "tests"]
+                }
               ],
               "label_extractor": [
                 {
@@ -86,32 +132,29 @@ jobs:
                 }
               ]
             }
+            
       - name: See CHANGELOG
-        if: contains(fromJSON(env.LABELS), 'audio')
+        if: steps.pr-labels.outputs.has-audio == 'true'
         run: |
-          echo "${{steps.changelog.outputs.changelog}}"
+          echo "${{ steps.changelog.outputs.changelog }}"
 
       - name: Release
-        if: contains(fromJSON(env.LABELS), 'audio')
+        if: steps.pr-labels.outputs.has-audio == 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.tag_version.outputs.new_version }}
           tag_name: ${{ steps.tag_version.outputs.new_version }}
-          body: ${{steps.changelog.outputs.changelog}}
+          body: ${{ steps.changelog.outputs.changelog }}
           body_path: CHANGELOG.MD
-          # note you'll typically need to create a personal access token
-          # with permissions to create releases in the other repo
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
           make_latest: true
-      - name: Auto-Merge Pull Request
-        if: contains(fromJSON(env.LABELS), 'cicd')
-        uses: reitermarkus/automerge@v2.8.0
+          
+      - name: Enable Auto-Merge on Pull Request
+        if: steps.pr-labels.outputs.has-cicd == 'true'
+        uses: peter-evans/enable-pull-request-automerge@v3
         with:
-          pull-request: ${{ steps.cpr.outputs.pr_number }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          required-labels: 'cicd'
-          do-not-merge-labels: 'audio'
+          pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
           merge-method: squash
-          squash-commit-title: "Auto Merging because it's just CI/CD"
-          squash-commit-message: "PR ${{ steps.cpr.outputs.pr_number }} doesn't need a new release so, merging"
+          # This will only merge after all required status checks pass
