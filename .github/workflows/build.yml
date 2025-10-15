@@ -150,11 +150,11 @@ jobs:
           prerelease: false
           make_latest: true
           
-      - name: Enable Auto-Merge on Pull Request
-        if: steps.pr-labels.outputs.has-cicd == 'true'
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
-          merge-method: squash
-          # This will only merge after all required status checks pass
+      # - name: Enable Auto-Merge on Pull Request
+      #   if: steps.pr-labels.outputs.has-cicd == 'true'
+      #   uses: peter-evans/enable-pull-request-automerge@v3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
+      #     merge-method: squash
+      #     # This will only merge after all required status checks pass
