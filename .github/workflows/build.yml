@@ -83,20 +83,21 @@ jobs:
             core.setOutput('labels', JSON.stringify(labels));
             core.setOutput('has-audio', labels.includes('audio'));
             core.setOutput('has-cicd', labels.includes('cicd'));
+            core.setOutput('should-release', labels.includes('audio') || labels.includes('cicd'));
             
       - name: Bump version and push tag
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
-          release_branches: master
+          release_branches: .*
           default_bump: patch
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_prerelease_bump: patch
-          tag_prefix: ''
+          tag_prefix: 'v'
+          dry_run: false
           
       - name: Release Changelog Builder
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v5
         with:
@@ -134,12 +135,12 @@ jobs:
             }
             
       - name: See CHANGELOG
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         run: |
           echo "${{ steps.changelog.outputs.changelog }}"
 
       - name: Release
-        if: steps.pr-labels.outputs.has-audio == 'true'
+        if: steps.pr-labels.outputs.should-release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.tag_version.outputs.new_version }}
@@ -150,11 +151,11 @@ jobs:
           prerelease: false
           make_latest: true
           
-      - name: Enable Auto-Merge on Pull Request
-        if: steps.pr-labels.outputs.has-cicd == 'true'
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
-          merge-method: squash
-          # This will only merge after all required status checks pass
+      # - name: Enable Auto-Merge on Pull Request
+      #   if: steps.pr-labels.outputs.has-cicd == 'true'
+      #   uses: peter-evans/enable-pull-request-automerge@v3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     pull-request-number: ${{ steps.check-pr.outputs.pr-number || steps.cpr.outputs.pr-number }}
+      #     merge-method: squash
+      #     # This will only merge after all required status checks pass
